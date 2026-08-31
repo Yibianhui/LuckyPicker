@@ -9,7 +9,7 @@
 **微软神经语音播报**（与 Edge TTS 同源音色）、**程序内名单编辑与 Excel 导入**、
 **抽选记录**、**桌面悬浮球**与**开机自启动**（26H2 Build 12 新增）。
 
-- 📥 下载页：<https://app.yibianhui.cn/luckypicker/>
+- 📥 下载页：<https://lr.yibianhui.cn/>
 - 📋 开发记录：[docs/CHANGELOG.md](docs/CHANGELOG.md)
 
 ## 功能特性
@@ -51,13 +51,13 @@
 
 | 平台 | 产物 | 获取 |
 | --- | --- | --- |
-| Windows | `Setup.exe`（安装版）/ `LuckyPicker.exe`（便携版） | [下载页](https://app.yibianhui.cn/luckypicker/) 或 [Releases](https://github.com/Yibianhui/LuckyPicker/releases) |
+| Windows | `Setup.exe`（安装版）/ `LuckyPicker.exe`（便携版） | [下载页](https://lr.yibianhui.cn/) 或 [Releases](https://github.com/Yibianhui/LuckyPicker/releases) |
 | Android | `LuckyPicker.apk`（WebView 壳，已签名） | 同上 |
 | Linux | `LuckyPicker-linux-x64.zip`（Electron，解压即用） | 同上 |
 | Web | 纯静态页面，任意现代浏览器打开 | `web/index.html` |
 
 检查更新：程序内「版本与更新」读取
-`https://app.yibianhui.cn/luckypicker/update.json`（默认），
+`https://lr.yibianhui.cn/update.json`（默认），
 旧地址 `yibianhui.cn/LuckyPicker/update.json` 失效时自动回退尝试。
 
 ## 目录结构
@@ -79,7 +79,7 @@ LuckyPicker/
 ├── web/               跨平台 Web 核心（悬浮球/Android/Linux 共用）+ 测试
 ├── android/           安卓工程（WebView 壳 + 开机自启桥接 + 无 Gradle 构建）
 ├── linux/             Electron 壳
-├── site/              下载页源码（部署于 app.yibianhui.cn/luckypicker/）
+├── site/              下载页源码（部署于 lr.yibianhui.cn）
 ├── tools/             embed_roster.py 私有名单注入工具
 ├── docs/              CHANGELOG.md 开发记录
 ├── students.demo.json 内置虚构示例名单（仓库默认）

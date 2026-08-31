@@ -61,7 +61,7 @@
   内嵌名单默认替换为**虚构示例名单**,真实名单经 `tools/embed_roster.py`
   本地注入、永不入库。
 - 正式开源:GitHub [Yibianhui/LuckyPicker](https://github.com/Yibianhui/LuckyPicker)(MIT)。
-- 下载站改版:`app.yibianhui.cn/luckypicker/`,与 YBH Blog App 下载页互设入口。
+- 下载站改版:`lr.yibianhui.cn/`,与 YBH Blog App 下载页互设入口。
 
 ## 更新接口协议(部署示例)
 
@@ -71,7 +71,7 @@
   "version": "26H2 Build 12",
   "build": 12,
   "channel": "26H2",
-  "url": "https://app.yibianhui.cn/luckypicker/",
+  "url": "https://lr.yibianhui.cn/",
   "notes": "1. ...",
   "releaseDate": "2026-08-31",
   "mandatory": false

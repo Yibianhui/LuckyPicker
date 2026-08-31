@@ -44,11 +44,22 @@ namespace LuckyPickerSetup
             "}";
         public const string ShortcutName = "YBH幸运摇人器";
         public const string LegacyShortcutName = "幸运摇人器";
+        public const string UninstallShortcutName = "卸载 YBH幸运摇人器";
         public const string RegKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\LuckyPicker";
         public const string Version = "26H2 Build 12";
         // 与主程序 AutoStart 保持一致的 Run 注册表项
         public const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
         public const string RunValueName = "YBHLuckyPicker";
+        // 本机数据目录（配置 / 语音缓存 / 抽选记录），卸载时一并清理
+        public static string LocalDataDir
+        {
+            get
+            {
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "LuckyPicker");
+            }
+        }
 
         public static string DefaultInstallDir
         {
@@ -90,6 +101,11 @@ namespace LuckyPickerSetup
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), ShortcutName + ".lnk");
         }
 
+        public static string StartMenuUninstallPath()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), UninstallShortcutName + ".lnk");
+        }
+
         public static string DesktopPath()
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), ShortcutName + ".lnk");
@@ -128,7 +144,11 @@ namespace LuckyPickerSetup
                 File.Copy(Application.ExecutablePath, uninstPath, true);
 
                 DeleteLegacyShortcuts();
-                if (startMenu) CreateShortcut(StartMenuPath(), exePath, installDir, "YBH幸运摇人器 - 班级随机摇人工具");
+                if (startMenu)
+                {
+                    CreateShortcut(StartMenuPath(), exePath, installDir, "YBH幸运摇人器 - 班级随机摇人工具");
+                    CreateShortcut(StartMenuUninstallPath(), uninstPath, installDir, "卸载 YBH幸运摇人器（清理程序与本地数据）");
+                }
                 if (desktop) CreateShortcut(DesktopPath(), exePath, installDir, "YBH幸运摇人器 - 班级随机摇人工具");
 
                 // 开机自启动（当前用户 Run 项，指向安装后的主程序）
@@ -189,14 +209,42 @@ namespace LuckyPickerSetup
             catch { }
         }
 
-        public static void RunUninstall()
+        /// <summary>执行卸载。confirmUI=true 时先弹确认框（从「应用和功能」/ 卸载快捷方式触发）。</summary>
+        public static void RunUninstall(bool confirmUI)
         {
             string dir = AppDomain.CurrentDomain.BaseDirectory;
+
+            if (confirmUI)
+            {
+                var ask = MessageBox.Show(
+                    "确定要卸载 YBH幸运摇人器 吗？\n\n" +
+                    "将删除：\n" +
+                    "  · 程序文件与快捷方式\n" +
+                    "  · 开机自启动设置\n" +
+                    "  · 本机数据（配置、语音缓存、抽选记录）\n\n" +
+                    "已安装目录中的名单文件 students.json 也会一并删除，请提前备份。",
+                    "卸载 YBH幸运摇人器",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (ask != DialogResult.Yes) Environment.Exit(0);
+            }
+
             TryDelete(StartMenuPath());
+            TryDelete(StartMenuUninstallPath());
             TryDelete(DesktopPath());
             DeleteLegacyShortcuts();
             RemoveAutoStart();
             try { Registry.CurrentUser.DeleteSubKeyTree(RegKey, false); } catch { }
+
+            // 清理本机数据目录（配置 / 语音缓存 / 抽选记录）
+            try
+            {
+                if (Directory.Exists(LocalDataDir))
+                {
+                    foreach (var f in Directory.GetFiles(LocalDataDir)) TryDelete(f);
+                    try { Directory.Delete(LocalDataDir, true); } catch { }
+                }
+            }
+            catch { }
 
             // 删除目录内除 Uninstall.exe 外的所有文件
             try
@@ -382,7 +430,7 @@ namespace LuckyPickerSetup
             statusLabel.Text = "安装完成！\n\n安装目录：" + dir +
                 "\n名单：" + (preloadChk.Checked ? "已添加预装名单" : "空名单（可稍后在程序内导入）") +
                 "\n开机自启动：" + (bootChk.Checked ? "已开启（登录后仅显示悬浮球）" : "未开启（可稍后在程序内设置）") +
-                "\n可通过“开始菜单 → YBH幸运摇人器”或桌面快捷方式启动。";
+                "\n可通过“开始菜单 → YBH幸运摇人器”或桌面快捷方式启动；\n卸载请用“开始菜单 → 卸载 YBH幸运摇人器”（会一并清理本机数据）。";
             statusLabel.ForeColor = Color.FromArgb(6, 95, 70);
             installBtn.Text = "完成";
             installBtn.Enabled = true;
@@ -434,7 +482,9 @@ namespace LuckyPickerSetup
 
             if (HasArg(args, "/uninstall") || HasArg(args, "-uninstall"))
             {
-                Installer.RunUninstall();
+                // /uninstall /silent = 静默卸载（不弹确认）；否则显示确认框
+                bool silent = HasArg(args, "/silent") || HasArg(args, "-silent");
+                Installer.RunUninstall(!silent);
                 return;
             }
 

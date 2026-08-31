@@ -121,6 +121,23 @@ table.grid tr:focus-within input { border-color: #93c5fd; }
   max-width: 56px; overflow: hidden; white-space: nowrap; text-align: center;
 }
 #lp-ball.flash { box-shadow: 0 0 0 5px rgba(59,130,246,0.35), 0 8px 22px rgba(37,99,235,0.5); }
+/* 客户端下载条 */
+.dl-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 96;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.96); border: 1px solid #e2e8f0; border-radius: 999px;
+  padding: 8px 12px 8px 18px; box-shadow: 0 10px 26px rgba(15,23,42,0.18);
+  font-size: 0.85rem; color: #4a5c78; white-space: nowrap;
+}
+.dl-bar a {
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+  background: linear-gradient(135deg,#2563eb,#1e40af); color: #fff; font-weight: 700;
+  border-radius: 999px; padding: 8px 18px; font-size: 0.88rem;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.35);
+}
+.dl-bar a:active { transform: scale(0.97); }
+@media (max-width: 520px) { .dl-bar { bottom: 10px; padding: 6px 10px; } .dl-bar .txt { display: none; } }
+
 #lpBallMenu {
   position: fixed; z-index: 95; background: #fff; border: 1px solid #e2e8f0;
   border-radius: 16px; box-shadow: 0 14px 34px rgba(15,23,42,0.25);
@@ -139,6 +156,11 @@ table.grid tr:focus-within input { border-color: #93c5fd; }
 </head>
 <body>
 <div id="app" class="card"></div>
+
+<div class="dl-bar">
+  <span class="txt">📱 想在桌面 / 手机上用客户端？</span>
+  <a href="https://lr.yibianhui.cn/" target="_blank" rel="noopener">⬇ 下载客户端</a>
+</div>
 <script src="pako.min.js"></script>
 <script src="app.js"></script>
 </body>

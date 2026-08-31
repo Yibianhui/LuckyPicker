@@ -610,7 +610,8 @@
       '<div class="banner">' +
       '  <span class="pill" id="classBadge">● 当前班级：-</span>' +
       '  <span class="row"><button class="btn btn-ghost" id="btnEditor">名单管理</button>' +
-      '  <button class="btn btn-ghost" id="btnSettings">语音设置</button></span>' +
+      '  <button class="btn btn-ghost" id="btnSettings">语音设置</button>'
+      '  <a class="btn btn-blue" style="text-decoration:none;" href="https://lr.yibianhui.cn/" target="_blank" rel="noopener">⬇ 下载客户端</a></span>' +
       '</div>' +
       '<div class="panel">' +
       '  <div class="panel-title">筛选</div>' +

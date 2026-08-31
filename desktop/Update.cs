@@ -39,9 +39,9 @@ namespace LuckyPicker
         public const string Display = "26H2 Build 12";
         public const string Channel = "26H2";
         public const int Build = 12;
-        public const string UpdateUrlDefault = "https://app.yibianhui.cn/luckypicker/update.json";
-        // 旧版默认地址：主接口失效时自动回退尝试
-        public const string UpdateUrlLegacy = "https://yibianhui.cn/LuckyPicker/update.json";
+        public const string UpdateUrlDefault = "https://lr.yibianhui.cn/update.json";
+        // 备用接口：主接口失效时自动回退尝试（镜像站 / 历史地址）
+        public const string UpdateUrlLegacy = "https://app.yibianhui.cn/luckypicker/update.json";
     }
 
     // ---------------- 更新检查结果 ----------------

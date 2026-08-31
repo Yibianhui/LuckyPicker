@@ -37,7 +37,7 @@ namespace LuckyPicker
         public static string TtsVoice = "zh-CN-XiaoxiaoNeural";
         public static string TtsSource = "auto"; // auto | azure | edge | baidu | off
         public static bool EdgeBlocked = false;  // Edge WebSocket 端点被拒（如国内网络）时持久化（仅 edge 直连模式使用）
-        public static string UpdateUrl = "https://app.yibianhui.cn/luckypicker/update.json"; // 检查更新接口地址
+        public static string UpdateUrl = "https://lr.yibianhui.cn/update.json"; // 检查更新接口地址
         public static bool BallVisible = true;  // 桌面悬浮球显示状态
         public static int BallX = -1;           // 悬浮球位置（-1 表示使用默认位置）
         public static int BallY = -1;
