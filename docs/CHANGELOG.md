@@ -1,0 +1,81 @@
+# YBH幸运摇人器 · 开发记录
+
+版本号规则：**26H2 Build ×**,每发布一次 × 递增 1。
+本记录整理自项目开发过程中的会话档案(2026-08)。
+
+## 2026-08-14 · 起点:LuckyRandom 网页原型
+
+- 最早的「幸运摇人器」是一个网页版原型(`data.js + index.html`),
+  配套 Python TTS 服务(`TTS_server`,输出 mp3 语音播报)。
+- 功能:班级/性别抽取、不重复模式、连抽、屏蔽名单。
+- 该原型保留在工作区 `LuckyRandom/` 目录,作为后续版本的效果参考。
+
+## 2026-08-14 · LuckyPicker(Win32)诞生
+
+- 参考 LuckyRandom 用 C# WinForms 重写为原生 Win32 桌面应用,
+  零第三方依赖,Windows 10/11 开箱即用。
+- 自绘圆角卡片 UI、随机滚动动画、班级选择弹窗、快捷键体系。
+- 同步交付 `Setup.exe` 安装程序(注册 HKCU 卸载项、快捷方式、可选预装名单)。
+
+## 2026-08-14 · 更自然的语音 + 名单编辑
+
+- 语音升级:微软翻译令牌接口换取 Azure Speech 令牌,**内置直连神经语音**
+  (晓晓/云希/云扬,与 Edge TTS 同源音色),国内网络可用;
+  多层降级:微软神经语音 → Edge 直连 → 百度翻译在线语音 → 本地 SAPI5。
+- 兼容性保障:Windows 10 内置 Media Foundation 播放 MP3,无需解码器;
+  全链路后台线程 + 超时控制,低配设备不卡顿。
+- 智能缓存:合成结果落盘,听过的名字秒播;后台预热整班名单。
+- 新增程序内名单管理:表格增删改、导入 Excel(.xlsx,内置 OOXML 解析)/
+  CSV(GBK/UTF-8 自动识别)、导入预览与列匹配。
+
+## 2026-08-14 · 走向多端:Android / Linux / Web
+
+- 抽出跨平台 Web 核心(`web/index.html + app.js`):同一套摇人逻辑、
+  纯 JS SHA-256/HMAC、微软神经语音直连 TTS、xlsx 解压(pako)。
+- Android:无 Gradle 纯命令行构建(aapt2 + d8 + apksigner),WebView 原生壳。
+- Linux:Electron 壳,解压即用。
+- 配套单元测试:核心逻辑/解析/真实 TTS 链路 13 项 + jsdom 界面冒烟 11 项。
+- 上线简单下载页,提供多版本选择下载。
+
+## 2026-08-15 · 26H2 版本体系(Build 11)
+
+- 更名「**YBH幸运摇人器**」,统一品牌。
+- 新增版本查看窗口:当前版本、更新通道、内部构建号、一键复制。
+- 新增检查更新接口协议(`update.json`):比较 build 号,
+  提示新版本并可打开下载页;适配 JS 访客验证站点(toNumbers/slowAES)。
+- 安装程序新增「预装名单」选项。
+
+## 2026-08-31 · Build 12:悬浮球 + 开机自启动 + 开源
+
+- **桌面悬浮球**:置顶小圆球,单击立即抽一人(语音播报与主界面一致),
+  拖动移动并记忆位置,右键菜单(显示主窗口/抽一人/连抽五人/重置候选池/
+  开机自启动/隐藏);抽中姓名在球面短暂显示,投屏场景远距离可见。
+- **开机自启动**:当前用户 Run 注册表项,无需管理员权限;
+  「版本与更新 → 偏好设置」与悬浮球菜单均可开关;开机启动带 `/min`
+  参数——不弹主窗口,只显示悬浮球;卸载自动清理。
+- Web 核心同步:页面内悬浮球(单击抽取/拖动/长按菜单),
+  Android 增加开机自启动桥接与 BOOT_COMPLETED 接收器
+  (遵循用户开关,默认关闭)。
+- 界面优化:标题统一品牌、版本号上屏、设置面板分组更清晰。
+- 文件整理:仓库结构化(desktop/ web/ android/ linux/ tools/ site/ docs/),
+  内嵌名单默认替换为**虚构示例名单**,真实名单经 `tools/embed_roster.py`
+  本地注入、永不入库。
+- 正式开源:GitHub [Yibianhui/LuckyPicker](https://github.com/Yibianhui/LuckyPicker)(MIT)。
+- 下载站改版:`app.yibianhui.cn/luckypicker/`,与 YBH Blog App 下载页互设入口。
+
+## 更新接口协议(部署示例)
+
+```json
+{
+  "product": "YBH幸运摇人器",
+  "version": "26H2 Build 12",
+  "build": 12,
+  "channel": "26H2",
+  "url": "https://app.yibianhui.cn/luckypicker/",
+  "notes": "1. ...",
+  "releaseDate": "2026-08-31",
+  "mandatory": false
+}
+```
+
+程序以 `build` 号与当前 Build 比较;`url` 存在时「发现新版本」可一键打开下载页。
