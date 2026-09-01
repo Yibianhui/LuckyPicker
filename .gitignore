@@ -30,3 +30,5 @@ TTS_server/temp_speech.mp3
 update.json
 .vscode/
 .idea/
+winui/bin/
+winui/obj/
