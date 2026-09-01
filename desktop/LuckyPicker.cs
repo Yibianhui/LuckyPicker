@@ -331,7 +331,34 @@ namespace LuckyPicker
             ResetPoolSilent();
             InitBall();
             InitTray();
+            ListenShowEvent();
             CheckUpdateSilent();
+        }
+
+        // 监听「新实例请求唤起主窗口」命名事件：重复启动程序时，把已运行实例的主窗口带到前台
+        void ListenShowEvent()
+        {
+            try
+            {
+                Task.Run((Action)delegate
+                {
+                    try
+                    {
+                        using (var ev = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, AppVersion.ShowMainEvent))
+                        {
+                            while (true)
+                            {
+                                ev.WaitOne();
+                                if (IsDisposed) return;
+                                try { BeginInvoke((Action)delegate { ShowMainFromBall(); }); }
+                                catch { return; }
+                            }
+                        }
+                    }
+                    catch { }
+                });
+            }
+            catch { }
         }
 
         // 后台静默检查更新：启动后执行，发现新版本时托盘气泡提醒（每日至多一次，不打扰）
@@ -1385,9 +1412,34 @@ namespace LuckyPicker
     // ---------------- 入口 ----------------
     static class Program
     {
+        static System.Threading.Mutex singleMutex;
+
         [STAThread]
         static void Main(string[] args)
         {
+            // ---- 单实例保护：已有实例在运行时，提示并唤起其主窗口，新实例退出 ----
+            bool firstInstance;
+            singleMutex = new System.Threading.Mutex(true, AppVersion.SingleInstanceMutex, out firstInstance);
+            if (!firstInstance)
+            {
+                bool notified = false;
+                try
+                {
+                    using (var ev = System.Threading.EventWaitHandle.OpenExisting(AppVersion.ShowMainEvent))
+                    {
+                        ev.Set();
+                        notified = true;
+                    }
+                }
+                catch { }
+                MessageBox.Show(
+                    "YBH幸运摇人器 已在运行中。\n\n" +
+                    (notified ? "已为你打开正在运行的主窗口。\n" : "可从桌面托盘图标或悬浮球唤出主窗口。\n") +
+                    "（单实例运行，不会重复启动）",
+                    AppVersion.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
             try
             {
                 AppConfig.Load();
@@ -1423,6 +1475,10 @@ namespace LuckyPicker
                 catch { }
                 MessageBox.Show("程序启动失败：" + ex.Message + "\n\n详情已写入 error.log", AppVersion.ProductName,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                try { if (singleMutex != null) singleMutex.ReleaseMutex(); } catch { }
             }
         }
     }

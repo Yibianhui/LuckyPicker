@@ -6,7 +6,7 @@
 //   返回 UTF-8 JSON：
 //   {
 //     "product":  "YBH幸运摇人器",
-//     "version":  "26H2 Build 12",     // 必填，展示给用户
+//     "version":  "26H2 Build 13",     // 必填，展示给用户
 //     "build":    12,                   // 可选，建议填写，用于精确比较
 //     "channel":  "26H2",               // 可选
 //     "url":      "https://你的网站/download.zip",  // 可选，新版本下载页
@@ -36,12 +36,15 @@ namespace LuckyPicker
     public static class AppVersion
     {
         public const string ProductName = "YBH幸运摇人器";
-        public const string Display = "26H2 Build 12";
+        public const string Display = "26H2 Build 13";
         public const string Channel = "26H2";
-        public const int Build = 12;
+        public const int Build = 13;
         public const string UpdateUrlDefault = "https://lr.yibianhui.cn/update.json";
         // 备用接口：主接口失效时自动回退尝试（镜像站 / 历史地址）
         public const string UpdateUrlLegacy = "https://app.yibianhui.cn/luckypicker/update.json";
+        // 单实例保护：全局命名互斥体 + 「唤起主窗口」命名事件
+        public const string SingleInstanceMutex = "YBH-LuckyPicker-SingleInstance";
+        public const string ShowMainEvent = "YBH-LuckyPicker-ShowMainEvent";
     }
 
     // ---------------- 更新检查结果 ----------------
@@ -432,7 +435,7 @@ namespace LuckyPicker
             return sb.ToString();
         }
 
-        // 从 "26H2 Build 12" 这类字符串中提取最后一个整数（Build 号）。
+        // 从 "26H2 Build 13" 这类字符串中提取最后一个整数（Build 号）。
         public static int ExtractLastInt(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
