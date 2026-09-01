@@ -338,9 +338,10 @@ namespace LuckyPicker
         {
             if (BootMinimized)
             {
-                // 开机自启：不弹窗口、不占任务栏，只留悬浮球
+                // 开机自启：完全不显示主窗口（连启动瞬间都不闪），只留悬浮球
                 WindowState = FormWindowState.Minimized;
                 ShowInTaskbar = false;
+                Hide();
             }
             ball = new FloatingBallForm(this);
             // 独立窗体（不传 owner）：主窗口最小化 / 隐藏时悬浮球仍置顶显示
@@ -380,26 +381,21 @@ namespace LuckyPicker
             PickMultiple(5);
         }
 
-        /// <summary>悬浮球点按班级选择菜单（小巧下拉，替代全屏弹窗）。</summary>
+        /// <summary>悬浮球点按弹出「选择班级」小窗（点选后立即抽取，替代全屏弹窗）。</summary>
         void ShowClassMenu()
         {
-            var menu = new ContextMenuStrip();
-            foreach (var id in classIds)
+            var mini = new ClassMiniForm(classIds, classNames, delegate (string cid)
             {
-                string cid = id;
-                string name = classNames.ContainsKey(cid) ? classNames[cid] : cid + "班";
-                menu.Items.Add(name, null, delegate
-                {
-                    SetInitialClass(cid);
-                    PickOne();
-                });
-            }
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("显示主窗口", null, delegate { ShowMainFromBall(); });
+                SetInitialClass(cid);
+                PickOne();
+            });
             if (ball != null && ball.Visible)
-                menu.Show(ball, new Point(0, 0));
+                mini.ShowNear(ball);
             else
-                menu.Show(this, new Point(Width / 2, Height / 2));
+            {
+                mini.StartPosition = FormStartPosition.CenterScreen;
+                mini.Show();
+            }
         }
 
         public void ResetPoolFromBall()

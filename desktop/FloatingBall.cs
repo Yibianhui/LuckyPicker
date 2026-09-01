@@ -11,6 +11,7 @@
 //       隐藏 / 显示可在主窗口「设置」菜单中切换，位置与状态均持久化。
 // ================================================================
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -245,6 +246,141 @@ namespace LuckyPicker
                         g.DrawString("摇", f, Brushes.White, face, fmt);
                 }
             }
+        }
+    }
+
+    // ================================================================
+    // ClassMiniForm — 班级快捷选择小窗（悬浮球点按弹出）
+    //
+    // 开机自启动后桌面只有悬浮球；单击球弹出这个小窗：
+    //   · 置顶、无边框、圆角卡片，显示在悬浮球旁（自动防出屏）
+    //   · 点选班级后立即抽一人，小窗自动关闭
+    //   · 点击窗体外部（失焦）直接关闭，不打扰桌面
+    // ================================================================
+    public class ClassMiniForm : Form
+    {
+        const int W = 236;
+        const int ItemH = 42;
+
+        readonly Action<string> onPick;
+        readonly List<KeyValuePair<string, string>> items = new List<KeyValuePair<string, string>>();
+        readonly List<Rectangle> itemRects = new List<Rectangle>();
+        int hoverIndex = -1;
+
+        public ClassMiniForm(IEnumerable<string> ids, Dictionary<string, string> names, Action<string> onPick)
+        {
+            this.onPick = onPick;
+
+            foreach (var id in ids)
+                items.Add(new KeyValuePair<string, string>(
+                    id, names != null && names.ContainsKey(id) ? names[id] : id + "班"));
+
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            TopMost = true;
+            StartPosition = FormStartPosition.Manual;
+            DoubleBuffered = true;
+            BackColor = Color.White;
+            Text = "选择班级";
+
+            int height = 70 + items.Count * (ItemH + 8) + 12;
+            Size = new Size(W, height);
+            var full = new Rectangle(0, 0, W - 1, height - 1);
+            Region = new Region(RoundPath(full, 16));
+
+            Deactivate += delegate { Close(); };
+        }
+
+        /// <summary>显示在悬浮球旁边（优先左侧，空间不足自动换边、防出屏）。</summary>
+        public void ShowNear(Control anchor)
+        {
+            var wa = Screen.PrimaryScreen.WorkingArea;
+            int x, y = Math.Max(wa.Top + 8, anchor.Top - 10);
+            if (anchor.Left - W - 10 >= wa.Left)
+                x = anchor.Left - W - 10;                            // 球左侧
+            else
+                x = Math.Min(anchor.Right + 10, wa.Right - W - 8);   // 球右侧
+            y = Math.Min(y, wa.Bottom - Height - 8);
+            Location = new Point(x, y);
+            Show();
+        }
+
+        int HitTest(Point p)
+        {
+            for (int i = 0; i < itemRects.Count; i++)
+                if (itemRects[i].Contains(p)) return i;
+            return -1;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            int h = HitTest(e.Location);
+            if (h != hoverIndex)
+            {
+                hoverIndex = h;
+                Cursor = h >= 0 ? Cursors.Hand : Cursors.Default;
+                Invalidate();
+            }
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (e.Button != MouseButtons.Left) return;
+            int h = HitTest(e.Location);
+            if (h < 0) return;
+            var pick = onPick;
+            Close();
+            if (pick != null) pick(items[h].Key);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            var full = new Rectangle(0, 0, W - 1, Height - 1);
+            using (var b = new SolidBrush(Color.White)) g.FillRectangle(b, full);
+            using (var p = new Pen(Color.FromArgb(147, 197, 253), 1f)) g.DrawPath(p, RoundPath(full, 16));
+
+            // 标题
+            using (var f = new Font("Microsoft YaHei", 11.5F, FontStyle.Bold))
+            using (var br = new SolidBrush(Color.FromArgb(30, 41, 59)))
+                g.DrawString("选择班级", f, br, new Rectangle(18, 12, W - 36, 24));
+            using (var f = new Font("Microsoft YaHei", 8F))
+            using (var br = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                g.DrawString("点选后立即抽取 · 点击空白处关闭", f, br, new Rectangle(18, 36, W - 36, 16));
+
+            // 班级按钮
+            itemRects.Clear();
+            int y = 62;
+            for (int i = 0; i < items.Count; i++)
+            {
+                var r = new Rectangle(14, y, W - 28, ItemH);
+                itemRects.Add(r);
+                bool hover = i == hoverIndex;
+                using (var b = new SolidBrush(hover ? Color.FromArgb(37, 99, 235) : Color.FromArgb(241, 245, 249)))
+                    g.FillPath(b, RoundPath(r, 12));
+                using (var f = new Font("Microsoft YaHei", 10F, FontStyle.Bold))
+                using (var br = new SolidBrush(hover ? Color.White : Color.FromArgb(30, 41, 59)))
+                using (var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                    g.DrawString(items[i].Key + "班 · " + items[i].Value, f, br, r, fmt);
+                y += ItemH + 8;
+            }
+        }
+
+        static GraphicsPath RoundPath(Rectangle b, int r)
+        {
+            var path = new GraphicsPath();
+            path.AddArc(b.X, b.Y, r, r, 180, 90);
+            path.AddArc(b.Right - r, b.Y, r, r, 270, 90);
+            path.AddArc(b.Right - r, b.Bottom - r, r, r, 0, 90);
+            path.AddArc(b.X, b.Bottom - r, r, r, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }
