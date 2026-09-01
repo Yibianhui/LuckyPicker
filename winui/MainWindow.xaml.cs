@@ -17,21 +17,29 @@ using Windows.Storage.Pickers;
 
 namespace LuckyPickerWinUI
 {
-    public sealed partial class MainWindow : Window
+    public sealed partial class MainWindow : Window, ILuckyBallHost
     {
         LuckyCore core => App.Core;
         TtsEngine tts;
         bool animating;
         string lastResultText = "";
+        FloatingBallForm? ball;
+        bool classChosen;
 
         public MainWindow()
         {
+            try { System.IO.File.AppendAllText(@"C://Users//a1894//lucky_crash.log", "W1-InitComponent\n"); } catch { }
             InitializeComponent();
+            try { System.IO.File.AppendAllText(@"C://Users//a1894//lucky_crash.log", "W2-AfterInitXaml\n"); } catch { }
             AppConfig.Load();
             InitCore();
             InitTray();
             ListenShowEvent();
             CheckUpdateSilent();
+            classChosen = !App.BootMinimized;
+            try { System.IO.File.AppendAllText(@"C://Users//a1894//lucky_crash.log", "W3-BeforeInitBall\n"); } catch { }
+            InitBall();
+            try { System.IO.File.AppendAllText(@"C://Users//a1894//lucky_crash.log", "W4-AfterInitBall\n"); } catch { }
             if (App.BootMinimized)
             {
                 HideWindow();
@@ -39,6 +47,100 @@ namespace LuckyPickerWinUI
             else if (core.classIds.Count > 1)
             {
                 _ = ShowClassDialogAsync();
+            }
+        }
+
+        // ---------- 悬浮球 ----------
+        void InitBall()
+        {
+            ball = new FloatingBallForm(this);
+            if (AppConfig.BallVisible || App.BootMinimized) ball.Show();
+        }
+
+        void ApplyBallVisibility()
+        {
+            if (ball == null || ball.IsDisposed) return;
+            if (AppConfig.BallVisible) { if (!ball.Visible) ball.Show(); }
+            else if (ball.Visible) ball.Hide();
+        }
+
+        // —— ILuckyBallHost 实现 ——
+        public void OnBallClicked()
+        {
+            if (!classChosen) { ShowClassMini(); return; }
+            DoBallPickOne();
+        }
+
+        public void OnBallPickOne() => DoBallPickOne();
+
+        public void OnBallPickMulti()
+        {
+            if (!classChosen) { ShowClassMini(); return; }
+            DoBallPickMulti();
+        }
+
+        public void OnBallResetPool()
+        {
+            core.ResetPool();
+            HintText.Text = "√ 不重复池已重置";
+            RefreshPoolStats();
+        }
+
+        public void OnBallHideSelf()
+        {
+            AppConfig.BallVisible = false;
+            AppConfig.Save();
+            ApplyBallVisibility();
+        }
+
+        public void OnBallQuit() => QuitApp();
+
+        public void ShowMainWindow() => ShowWindow();
+
+        void DoBallPickOne()
+        {
+            var picked = core.PickOne();
+            if (picked == null)
+            {
+                HintText.Text = "※ 当前无候选人";
+                return;
+            }
+            ball?.ShowPicked(picked.name);
+            Speak(picked.name);
+            AddHistory(new HistoryEntry { time = Now(), text = picked.name, classId = core.currentClassId });
+            RefreshPoolStats();
+        }
+
+        void DoBallPickMulti()
+        {
+            var list = core.PickMulti(5);
+            if (list.Count == 0)
+            {
+                HintText.Text = "※ 当前无候选人";
+                return;
+            }
+            ball?.ShowPicked(list.Count + "人");
+            Speak(string.Join("、", list.Select(x => x.name)));
+            AddHistory(new HistoryEntry { time = Now(), text = "连抽： " + string.Join("、", list.Select(x => x.name)), classId = core.currentClassId });
+            RefreshPoolStats();
+        }
+
+        // 班级小窗（WinForms 复用：置顶圆角卡片，失焦关闭，点选立即抽取）
+        void ShowClassMini()
+        {
+            var mini = new ClassMiniForm(core.classIds, core.classNames, cid =>
+            {
+                core.SetClass(cid);
+                classChosen = true;
+                RefreshBadge();
+                RefreshPoolStats();
+                DoBallPickOne();
+            });
+            if (ball != null && ball.Visible) mini.ShowNear(ball);
+            else
+            {
+                mini.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+                mini.Show();
             }
         }
 
@@ -303,12 +405,14 @@ namespace LuckyPickerWinUI
         {
             AppConfig.BallVisible = MenuBall.IsChecked;
             AppConfig.Save();
+            ApplyBallVisibility();
         }
 
         void OnMenuQuit(object sender, RoutedEventArgs e) => QuitApp();
 
         public void QuitApp()
         {
+            try { ball?.Dispose(); } catch { }
             try { tray?.Dispose(); } catch { }
             Environment.Exit(0);
         }

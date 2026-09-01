@@ -15,7 +15,12 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <!-- 关闭默认 Compile glob：避免与 XamlCompiler 显式 Include 的 obj 生成文件双重编译 -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="icon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
