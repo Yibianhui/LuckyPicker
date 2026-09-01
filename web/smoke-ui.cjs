@@ -27,6 +27,12 @@ setTimeout(() => {
   classBtns[0].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   check('main rendered', !!doc.getElementById('pickBtn'));
   check('class select populated', doc.querySelectorAll('#classSelect option').length >= 3);
+  // 主界面完整性：innerHTML 拼接一旦被截断（如漏写 +），筛选/抽取区会全部丢失
+  check('main fully built', !!doc.getElementById('classSelect') && !!doc.getElementById('pickBtn') &&
+    !!doc.getElementById('blockInput') && !!doc.getElementById('voiceBadge'));
+  // 「下载客户端」按钮必须在 banner 中渲染出来
+  const dlLink = doc.querySelector('.banner a.btn-blue[href*="lr.yibianhui.cn"]');
+  check('download btn in banner', !!dlLink);
   const badge = doc.getElementById('classBadge');
   check('badge shows class', badge && badge.textContent.indexOf('当前班级') >= 0);
   // 3) 抽一人（动画后落定）

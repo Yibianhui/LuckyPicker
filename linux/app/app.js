@@ -610,7 +610,7 @@
       '<div class="banner">' +
       '  <span class="pill" id="classBadge">● 当前班级：-</span>' +
       '  <span class="row"><button class="btn btn-ghost" id="btnEditor">名单管理</button>' +
-      '  <button class="btn btn-ghost" id="btnSettings">语音设置</button>'
+      '  <button class="btn btn-ghost" id="btnSettings">语音设置</button>' +
       '  <a class="btn btn-blue" style="text-decoration:none;" href="https://lr.yibianhui.cn/" target="_blank" rel="noopener">⬇ 下载客户端</a></span>' +
       '</div>' +
       '<div class="panel">' +
@@ -867,6 +867,8 @@
 
   function initMain() {
     if (!state.classId) return;
+    // 恢复主卡片显示（班级选择阶段为避免空白卡片露边会临时隐藏）
+    if (app) app.style.display = '';
     renderMain();
     refreshPool();
     updateBadge();
@@ -898,6 +900,13 @@
       else if (tab === 'classes') renderClassesTab(body, o);
       else renderSettingsTab(body, o);
     }
+    // 供导入流程调用：导入后重绘当前 tab，保证「保存」能读到最新表格
+    refreshEditorTab = renderTab;
+    refreshEditorBody = body;
+    function clearEditorRefs() {
+      refreshEditorTab = null;
+      refreshEditorBody = null;
+    }
     for (var i = 0; i < tabs.length; i++) {
       tabs[i].addEventListener('click', function () {
         tab = this.getAttribute('data-tab');
@@ -905,8 +914,10 @@
         renderTab();
       });
     }
-    o.querySelector('#closeBtn').addEventListener('click', function () { closeOverlay(o); });
+    o.querySelector('#closeBtn').addEventListener('click', function () { clearEditorRefs(); closeOverlay(o); });
     o.querySelector('#saveBtn').addEventListener('click', function () {
+      // 先取快照：若当前标签页没有可读取的表格（如刚导入后 UI 被替换），
+      // 保存函数会直接返回，绝不能把名单清空。
       if (tab === 'students') saveStudentsTab(body);
       else if (tab === 'classes') saveClassesTab(body);
       else saveSettingsTab();
@@ -915,8 +926,8 @@
       updateBadge();
       renderBlocklist();
       renderResult();
-      body.innerHTML = '<div class="m-sub" style="color:#059669;">已保存 √</div>';
-      setTimeout(renderTab, 600);
+      renderTab();
+      showEditorNote('已保存并写入本机浏览器 √（建议定期点「导出」备份名单）');
     });
     renderTab();
   }
@@ -925,13 +936,14 @@
     var h = '<div class="row" style="margin-bottom:10px;">' +
       '<button class="btn btn-ghost" id="addRow" type="button">＋ 添加学生</button>' +
       '<button class="btn btn-ghost" id="delRow" type="button">－ 删除选中</button>' +
-      '<button class="btn btn-ghost" id="impBtn" type="button">导入 Excel/CSV</button>' +
-      '<button class="btn btn-ghost" id="expBtn" type="button">导出</button>' +
+      '<button class="btn btn-ghost" id="impBtn" type="button">导入</button>' +
+      '<button class="btn btn-ghost" id="expBtn" type="button">导出备份</button>' +
       '</div>' +
       '<div class="preview-wrap" style="max-height:300px;">' +
       '<table class="grid" id="stuGrid"><thead><tr><th style="width:24px;"></th><th>姓名</th><th style="width:80px;">班级</th><th style="width:80px;">性别</th></tr></thead><tbody id="stuBody"></tbody></table>' +
       '</div>' +
-      '<div class="muted">提示：.xlsx/.csv 均可导入；旧版 .xls 请先另存为 .xlsx 或 .csv。</div>';
+      '<div class="muted">可导入 .xlsx / .csv / JSON 备份（旧版 .xls 请先另存为 .xlsx）；' +
+      '名单保存在<b>本浏览器</b>，换设备或清理浏览器数据会丢失，建议定期点「导出备份」。</div>';
     return h;
   }
   function renderStudentsTab(body, o) {
@@ -971,6 +983,8 @@
   }
   function saveStudentsTab(body) {
     var rows = body.querySelectorAll('#stuBody tr');
+    // 安全保护：当前 UI 不是学生表格时直接返回，绝不能用空列表覆盖已有名单
+    if (!rows || !rows.length) return;
     var out = [];
     for (var i = 0; i < rows.length; i++) {
       var name = (rows[i].querySelector('.f-name').value || '').trim();
@@ -1003,6 +1017,8 @@
   }
   function saveClassesTab(body) {
     var rows = body.querySelectorAll('#clsBody tr');
+    // 同上保护：没有班级表格时不覆盖
+    if (!rows) return;
     var cls = {};
     for (var i = 0; i < rows.length; i++) {
       var id = (rows[i].querySelector('.f-id').value || '').trim();
@@ -1091,17 +1107,54 @@
   }
 
   // ---------- 导入 ----------
+  // 编辑器当前 tab 的重绘回调（导入后必须重绘，保证「保存」能读到最新表格）
+  var refreshEditorTab = null;
+  var refreshEditorBody = null;
+
+  function showEditorNote(text) {
+    if (!refreshEditorBody) return;
+    var body = refreshEditorBody;
+    var old = body.querySelector('.ed-note');
+    if (old) old.parentNode.removeChild(old);
+    var d = document.createElement('div');
+    d.className = 'ed-note';
+    d.textContent = text;
+    body.insertBefore(d, body.firstChild);
+  }
+
   function openImport(body, o) {
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
-    fileInput.accept = '.xlsx,.csv';
+    fileInput.accept = '.xlsx,.csv,.json';
     fileInput.addEventListener('change', function () {
       var file = fileInput.files[0];
       if (!file) return;
       var reader = new FileReader();
       reader.onload = function () {
+        // ① JSON 备份恢复（程序内「导出」的 students.json）
+        if (/\.json$/i.test(file.name)) {
+          try {
+            var obj = JSON.parse(String(reader.result));
+            var st = obj && obj.students ? obj.students : null;
+            if (!st || !st.length) { alert('该 JSON 中没有学生数据'); return; }
+            if (confirm('共读取到 ' + st.length + ' 名学生。\n确定 = 替换现有名单\n取消 = 追加到末尾')) {
+              state.students = st.slice();
+            } else {
+              state.students = state.students.concat(st);
+            }
+            if (obj.classes) {
+              for (var cid in obj.classes) if (!state.classes[cid]) state.classes[cid] = obj.classes[cid];
+            }
+            finishImport(st.length);
+          } catch (e) {
+            alert('JSON 解析失败：' + e.message);
+          }
+          return;
+        }
+
+        // ② Excel / CSV
         var rows = null;
-        if (/.xlsx$/i.test(file.name)) {
+        if (/\.xlsx$/i.test(file.name)) {
           var u8 = new Uint8Array(reader.result);
           rows = Core.parseXlsx(u8, (typeof pako !== 'undefined') ? pako : null);
           if (!rows) { alert('无法解析该 .xlsx 文件'); return; }
@@ -1114,16 +1167,29 @@
           var mode = confirm('共解析到 ' + students.length + ' 名学生。\n确定 = 替换现有名单\n取消 = 追加到末尾');
           if (mode) state.students = students.slice();
           else state.students = state.students.concat(students);
-          saveStore();
-          refreshPool();
-          renderBlocklist();
-          body.innerHTML = '<div class="m-sub" style="color:#059669;">已导入 ' + students.length + ' 名学生，点击「保存」生效 √</div>';
+          finishImport(students.length);
         });
       };
-      if (/.xlsx$/i.test(file.name)) reader.readAsArrayBuffer(file);
+      if (/\.xlsx$/i.test(file.name)) reader.readAsArrayBuffer();
       else reader.readAsText(file);
     });
     fileInput.click();
+  }
+
+  /**
+   * 导入收尾：补齐班级名 → 立即保存到本机 → 重绘编辑器表格 → 提示。
+   * 关键：必须重绘表格，否则「保存」按钮读不到行数据，会把名单清空。
+   */
+  function finishImport(count) {
+    var ids = {};
+    for (var i = 0; i < state.students.length; i++) ids[state.students[i].classId] = true;
+    for (var cid in ids) if (!state.classes[cid]) state.classes[cid] = cid + '班';
+
+    saveStore();
+    refreshPool();
+    renderBlocklist();
+    if (typeof refreshEditorTab === 'function') refreshEditorTab();
+    showEditorNote('已导入 ' + count + ' 名学生，名单已保存到本浏览器 \u2713 建议点「导出」留一份备份。');
   }
 
   function openMapping(rows, onDone) {
@@ -1349,6 +1415,9 @@
     };
     var vc = TTS.pickVoice();
     TTS.status('♪ 语音：' + (TTS.online ? '在线神经语音优先 · ' : '本地语音模式 · ') + (vc ? '本地语音备用就绪' : '本地语音备用'));
+    // 先渲染主界面（默认班级），避免班级选择遮罩下露出空白卡片形成的“白条”
+    state.classId = classIdsSorted()[0] || '1';
+    renderMain();
     ensureBall();
     showClassModal();
   }
