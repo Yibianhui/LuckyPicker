@@ -331,6 +331,47 @@ namespace LuckyPicker
             ResetPoolSilent();
             InitBall();
             InitTray();
+            CheckUpdateSilent();
+        }
+
+        // 后台静默检查更新：启动后执行，发现新版本时托盘气泡提醒（每日至多一次，不打扰）
+        void CheckUpdateSilent()
+        {
+            try
+            {
+                Task.Run((Action)delegate
+                {
+                    try
+                    {
+                        string today = DateTime.Now.ToString("yyyy-MM-dd");
+                        if (string.Equals(AppConfig.LastUpdateCheckDate, today, StringComparison.Ordinal)) return;
+                        var res = UpdateManager.Check(AppConfig.UpdateUrl);
+                        // 默认地址失效时回退旧地址（历史部署位置）
+                        if ((res == null || !res.Success) &&
+                            string.Equals(AppConfig.UpdateUrl, AppVersion.UpdateUrlDefault, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var alt = UpdateManager.Check(AppVersion.UpdateUrlLegacy);
+                            if (alt != null && alt.Success) res = alt;
+                        }
+                        AppConfig.LastUpdateCheckDate = today;
+                        AppConfig.Save();
+                        if (res != null && res.Success && res.HasUpdate && trayIcon != null && !IsDisposed)
+                        {
+                            try
+                            {
+                                trayIcon.BalloonTipTitle = AppVersion.ProductName + " 有新版本";
+                                trayIcon.BalloonTipText = "发现新版本 " + res.LatestVersion +
+                                    "，在「设置 → 版本 · 更新」中查看下载。";
+                                trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+                                trayIcon.ShowBalloonTip(8000);
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+                });
+            }
+            catch { }
         }
 
         // ============ 悬浮球 ============

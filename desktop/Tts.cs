@@ -41,6 +41,7 @@ namespace LuckyPicker
         public static bool BallVisible = true;  // 桌面悬浮球显示状态
         public static int BallX = -1;           // 悬浮球位置（-1 表示使用默认位置）
         public static int BallY = -1;
+        public static string LastUpdateCheckDate = ""; // 静默检查更新的日期（yyyy-MM-dd，每日至多提醒一次）
 
         public static void Load()
         {
@@ -59,6 +60,7 @@ namespace LuckyPicker
                 if (dict.TryGetValue("ballVisible", out v) && v is bool) BallVisible = (bool)v;
                 if (dict.TryGetValue("ballX", out v)) { int xi; if (int.TryParse(v.ToString(), out xi)) BallX = xi; }
                 if (dict.TryGetValue("ballY", out v)) { int yi; if (int.TryParse(v.ToString(), out yi)) BallY = yi; }
+                if (dict.TryGetValue("lastUpdateCheckDate", out v) && v is string) LastUpdateCheckDate = (string)v;
             }
             catch { }
         }
@@ -70,7 +72,7 @@ namespace LuckyPicker
                 Directory.CreateDirectory(Dir);
                 var ser = new JavaScriptSerializer();
                 File.WriteAllText(ConfigPath,
-                    ser.Serialize(new { ttsOnline = TtsOnline, ttsVoice = TtsVoice, ttsSource = TtsSource, edgeBlocked = EdgeBlocked, updateUrl = UpdateUrl, ballVisible = BallVisible, ballX = BallX, ballY = BallY }));
+                    ser.Serialize(new { ttsOnline = TtsOnline, ttsVoice = TtsVoice, ttsSource = TtsSource, edgeBlocked = EdgeBlocked, updateUrl = UpdateUrl, ballVisible = BallVisible, ballX = BallX, ballY = BallY, lastUpdateCheckDate = LastUpdateCheckDate }));
             }
             catch { }
         }

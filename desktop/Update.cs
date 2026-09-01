@@ -539,7 +539,7 @@ namespace LuckyPicker
 
             var urlHint = new Label
             {
-                Text = "默认已指向 app.yibianhui.cn/luckypicker；失效时自动回退旧地址，也可填本机 update.json 路径测试。",
+                Text = "默认指向 lr.yibianhui.cn/update.json；失效自动回退旧地址，也可填本机 update.json 路径测试。",
                 Font = new Font("Microsoft YaHei", 8F),
                 ForeColor = Color.FromArgb(90, 110, 138),
                 AutoSize = true,
@@ -704,6 +704,20 @@ namespace LuckyPicker
             }
         }
 
+        // 打开窗口即自动检查一次（后台线程执行，不阻塞界面）
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            try
+            {
+                if (!string.IsNullOrEmpty(urlBox.Text.Trim()))
+                {
+                    BeginInvoke((Action)delegate { StartCheck(); });
+                }
+            }
+            catch { }
+        }
+
         void SaveUrl()
         {
             string url = urlBox.Text.Trim();
@@ -721,8 +735,7 @@ namespace LuckyPicker
 
         void StartCheck()
         {
-            string url = urlBox.Text.Trim();
-            if (url.Length == 0)
+            string url = urlBox.Text.Trim();            if (url.Length == 0)
             {
                 MessageBox.Show(this,
                     "请先填写更新接口地址。\n\n将 update.json 部署到个人网站后，把地址粘贴到输入框（例如：\nhttps://你的网站/ybh-luckypicker/update.json）。",
