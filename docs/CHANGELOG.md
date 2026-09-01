@@ -63,6 +63,22 @@
 - 正式开源:GitHub [Yibianhui/LuckyPicker](https://github.com/Yibianhui/LuckyPicker)(MIT)。
 - 下载站改版:`lr.yibianhui.cn/`,与 YBH Blog App 下载页互设入口。
 
+
+## 2026-09-01 · Build 12 打磨:托盘 / 悬浮球 / 设置菜单 / 系统目录安装
+
+- **关闭最小化到托盘**:点关闭不退出,托盘图标常驻(双击恢复、右键退出)。
+- **悬浮球重做**:简约单色,独立于主窗口(最小化/隐藏时仍常驻);
+  抽中结果单行显示(单人显姓名 / 多人显「N 人」,修复换行错位);
+  开机自启仅悬浮球时,点按弹出**班级选择菜单**(替代全屏弹窗)。
+- **菜单布局**:右上角「设置 ▼」集成名单管理 / 抽选记录 / 版本更新 /
+  开机自启动开关 / 桌面悬浮球开关。
+- **安装器**:修复「找不到名单文件」bug(资源名统一 students.json);
+  默认安装到**系统目录**(Program Files,UAC requireAdministrator),
+  卸载注册表 HKLM;名单数据写入 %ProgramData%\LuckyPicker(系统目录下可写)。
+- **界面**:字号整体加大(标题 27pt / 按钮 14.5pt),顶部集成设置按钮更简洁;
+  评估 WinUI 3 但因其需 WinAppSDK runtime 部署复杂,改用 GDI 自绘现代风
+  (零第三方依赖,Windows 10/11 兼容)。
+
 ## 更新接口协议(部署示例)
 
 ```json

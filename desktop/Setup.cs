@@ -60,14 +60,25 @@ namespace LuckyPickerSetup
                     "LuckyPicker");
             }
         }
+        // 共享数据目录（名单文件），安装到系统目录后写入此处，卸载时清理
+        public static string ProgramDataDir
+        {
+            get
+            {
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "LuckyPicker");
+            }
+        }
 
         public static string DefaultInstallDir
         {
             get
             {
+                // 系统目录：便于统一管理（Setup.exe 带 requireAdministrator 清单）
                 return Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Programs", "LuckyPicker");
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "LuckyPicker");
             }
         }
 
@@ -140,6 +151,14 @@ namespace LuckyPickerSetup
                     File.WriteAllText(dataPath, EmptyStudentsJson, new UTF8Encoding(false));
                 ExtractResource(UpdateSample, Path.Combine(installDir, UpdateSample));
 
+                // 名单同时写入共享数据目录 %ProgramData%\LuckyPicker（系统目录下主程序可写）
+                try
+                {
+                    Directory.CreateDirectory(ProgramDataDir);
+                    File.Copy(dataPath, Path.Combine(ProgramDataDir, DataFile), true);
+                }
+                catch { }
+
                 // 复制自身作为卸载程序
                 File.Copy(Application.ExecutablePath, uninstPath, true);
 
@@ -154,8 +173,8 @@ namespace LuckyPickerSetup
                 // 开机自启动（当前用户 Run 项，指向安装后的主程序）
                 SetAutoStart(autoStart, exePath);
 
-                // 注册卸载信息
-                var key = Registry.CurrentUser.CreateSubKey(RegKey);
+                // 注册卸载信息（系统目录安装 → 写入 HKLM）
+                var key = Registry.LocalMachine.CreateSubKey(RegKey);
                 if (key != null)
                 {
                     key.SetValue("DisplayName", "YBH幸运摇人器");
@@ -233,6 +252,8 @@ namespace LuckyPickerSetup
             TryDelete(DesktopPath());
             DeleteLegacyShortcuts();
             RemoveAutoStart();
+            // 卸载项清理（HKLM 新装 / HKCU 旧装都兼容）
+            try { Registry.LocalMachine.DeleteSubKeyTree(RegKey, false); } catch { }
             try { Registry.CurrentUser.DeleteSubKeyTree(RegKey, false); } catch { }
 
             // 清理本机数据目录（配置 / 语音缓存 / 抽选记录）
@@ -242,6 +263,16 @@ namespace LuckyPickerSetup
                 {
                     foreach (var f in Directory.GetFiles(LocalDataDir)) TryDelete(f);
                     try { Directory.Delete(LocalDataDir, true); } catch { }
+                }
+            }
+            catch { }
+
+            // 清理共享数据目录（名单文件）
+            try
+            {
+                if (Directory.Exists(ProgramDataDir))
+                {
+                    try { Directory.Delete(ProgramDataDir, true); } catch { }
                 }
             }
             catch { }

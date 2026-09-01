@@ -172,7 +172,7 @@ namespace LuckyPicker
             {
                 Text = "语音会缓存到本机（%LOCALAPPDATA%\\LuckyPicker\\tts），听过的名字再次抽取时无需联网、立即播放。\n" +
                        "提示：微软神经语音走 Azure Speech REST 接口（内置，直连可用），与 Edge TTS 同源音色。\n" +
-                       "名单文件 students.json 与程序同目录，保存后立即生效，无需重启。",
+                       "名单保存在 ProgramData\\LuckyPicker\\students.json，保存后立即生效，无需重启。",
                 Location = new Point(24, 156),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(90, 110, 138)
@@ -288,7 +288,7 @@ namespace LuckyPicker
             foreach (var id in students.Select(s => s.classId).Distinct())
                 if (!classes.ContainsKey(id)) classes[id] = id + "班";
 
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "students.json");
+            string path = MainForm.DataPath();
             try
             {
                 var ser = new JavaScriptSerializer();
@@ -296,7 +296,7 @@ namespace LuckyPicker
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "保存失败：" + ex.Message + "\n\n请确认程序所在目录可写（便携版请放在可写文件夹）。",
+                MessageBox.Show(this, "保存失败：" + ex.Message + "\n\n名单保存在 " + path + "，请确认该目录可写。",
                     "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }

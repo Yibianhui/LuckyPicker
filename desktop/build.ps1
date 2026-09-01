@@ -34,8 +34,9 @@ Write-Host '==> 编译 主程序 LuckyPicker.exe'
 & $csc /nologo /target:winexe /optimize+ /win32icon:$icon /out:dist\LuckyPicker.exe "/res:$students,LuckyPicker.students.json" /r:System.dll /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:$speech /r:$webx /r:System.IO.Compression.dll /r:System.Xml.dll /r:System.Xml.Linq.dll LuckyPicker.cs Tts.cs AutoStart.cs FloatingBall.cs DataIO.cs Editor.cs Update.cs History.cs
 if ($LASTEXITCODE -ne 0) { Write-Error '主程序编译失败'; exit $LASTEXITCODE }
 
-Write-Host '==> 编译 安装程序 Setup.exe'
-& $csc /nologo /target:winexe /optimize+ /win32icon:$icon /out:dist\Setup.exe /res:dist\LuckyPicker.exe,LuckyPicker.exe "/res:$students,$studentsName" "/res:$updateSample,update.sample.json" /r:System.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll Setup.cs
+Write-Host '==> 编译 安装程序 Setup.exe（含 UAC requireAdministrator 清单）'
+# 注意：名单资源名固定为 students.json，与 Setup.cs ExtractResource(DataFile) 一致
+& $csc /nologo /target:winexe /optimize+ /win32icon:$icon /win32manifest:setup.manifest /out:dist\Setup.exe /res:dist\LuckyPicker.exe,LuckyPicker.exe "/res:$students,students.json" "/res:$updateSample,update.sample.json" /r:System.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll Setup.cs
 if ($LASTEXITCODE -ne 0) { Write-Error '安装程序编译失败'; exit $LASTEXITCODE }
 
 Write-Host '==> 编译 离线单元测试 ConsoleTest.exe'

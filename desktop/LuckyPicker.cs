@@ -299,13 +299,17 @@ namespace LuckyPicker
         /// <summary>true = 开机自启动静默启动（/min）：只显示悬浮球，不弹主窗口。</summary>
         public bool BootMinimized { get; set; }
 
+        // 托盘与退出控制
+        NotifyIcon trayIcon;
+        bool reallyExit;
+
         // 控件
         ComboBox classCombo;
         TextBox blockInput;
         FlowLayoutPanel chipPanel;
 
         // 命中按钮状态
-        enum BtnId { GenderAll, GenderMale, GenderFemale, Toggle, Pick, Multi, Reset, AddBlock, Editor, History, About, Replay }
+        enum BtnId { GenderAll, GenderMale, GenderFemale, Toggle, Pick, Multi, Reset, AddBlock, Settings, Replay }
         Dictionary<BtnId, Rectangle> btnRect = new Dictionary<BtnId, Rectangle>();
         HashSet<BtnId> hoverBtns = new HashSet<BtnId>();
 
@@ -326,6 +330,7 @@ namespace LuckyPicker
             InitSpeech();
             ResetPoolSilent();
             InitBall();
+            InitTray();
         }
 
         // ============ 悬浮球 ============
@@ -338,7 +343,8 @@ namespace LuckyPicker
                 ShowInTaskbar = false;
             }
             ball = new FloatingBallForm(this);
-            if (AppConfig.BallVisible || BootMinimized) ball.Show(this);
+            // 独立窗体（不传 owner）：主窗口最小化 / 隐藏时悬浮球仍置顶显示
+            if (AppConfig.BallVisible || BootMinimized) ball.Show();
             classChosen = false;
         }
 
@@ -346,7 +352,7 @@ namespace LuckyPicker
         public void ApplyBallVisibility()
         {
             if (ball == null || ball.IsDisposed) return;
-            if (AppConfig.BallVisible) { if (!ball.Visible) ball.Show(this); }
+            if (AppConfig.BallVisible) { if (!ball.Visible) ball.Show(); }
             else if (ball.Visible) ball.Hide();
         }
 
@@ -356,18 +362,44 @@ namespace LuckyPicker
         }
 
         // —— 供悬浮球调用的公开动作 ——
+        /// <summary>单击悬浮球：已选班级则抽一人；未选班级（如开机自启后）弹班级选择菜单。</summary>
+        public void OnBallClicked()
+        {
+            if (!classChosen) { ShowClassMenu(); return; }
+            PickOne();
+        }
+
         public void PickOneFromBall()
         {
-            EnsureClassChosen();
-            if (!classChosen) return;
-            PickOne();
+            OnBallClicked();
         }
 
         public void PickMultiFromBall()
         {
-            EnsureClassChosen();
-            if (!classChosen) return;
+            if (!classChosen) { ShowClassMenu(); return; }
             PickMultiple(5);
+        }
+
+        /// <summary>悬浮球点按班级选择菜单（小巧下拉，替代全屏弹窗）。</summary>
+        void ShowClassMenu()
+        {
+            var menu = new ContextMenuStrip();
+            foreach (var id in classIds)
+            {
+                string cid = id;
+                string name = classNames.ContainsKey(cid) ? classNames[cid] : cid + "班";
+                menu.Items.Add(name, null, delegate
+                {
+                    SetInitialClass(cid);
+                    PickOne();
+                });
+            }
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("显示主窗口", null, delegate { ShowMainFromBall(); });
+            if (ball != null && ball.Visible)
+                menu.Show(ball, new Point(0, 0));
+            else
+                menu.Show(this, new Point(Width / 2, Height / 2));
         }
 
         public void ResetPoolFromBall()
@@ -400,15 +432,93 @@ namespace LuckyPicker
             }
         }
 
+        // ============ 托盘与退出 ============
+        void InitTray()
+        {
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("显示主窗口", null, delegate { ShowMainFromBall(); });
+            var bootItem = new ToolStripMenuItem("开机自启动")
+            {
+                CheckOnClick = true,
+                Checked = AutoStart.IsEnabled()
+            };
+            bootItem.Click += delegate
+            {
+                bool ok = AutoStart.SetEnabled(bootItem.Checked);
+                bootItem.Checked = ok && bootItem.Checked;
+            };
+            menu.Items.Add(bootItem);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("退出", null, delegate { QuitApp(); });
+
+            trayIcon = new NotifyIcon
+            {
+                Text = AppVersion.ProductName + " · " + AppVersion.Display,
+                ContextMenuStrip = menu,
+                Visible = true
+            };
+            try { trayIcon.Icon = this.Icon; } catch { }
+            trayIcon.DoubleClick += delegate { ShowMainFromBall(); };
+        }
+
+        /// <summary>主界面「设置」下拉菜单。</summary>
+        void ShowSettingsMenu()
+        {
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("名单管理 · 导入", null, delegate { OpenEditor(); });
+            menu.Items.Add("抽选记录", null, delegate { OpenHistory(); });
+            menu.Items.Add("版本 · 更新", null, delegate { OpenAbout(); });
+            menu.Items.Add(new ToolStripSeparator());
+            var bootItem = new ToolStripMenuItem("开机自启动")
+            {
+                CheckOnClick = true,
+                Checked = AutoStart.IsEnabled()
+            };
+            bootItem.Click += delegate
+            {
+                bool ok = AutoStart.SetEnabled(bootItem.Checked);
+                bootItem.Checked = ok && bootItem.Checked;
+                if (!ok)
+                    MessageBox.Show(this, "设置开机自启动失败（注册表写入被拒绝）。", "提示",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            };
+            menu.Items.Add(bootItem);
+            var ballItem = new ToolStripMenuItem("桌面悬浮球")
+            {
+                CheckOnClick = true,
+                Checked = AppConfig.BallVisible
+            };
+            ballItem.Click += delegate
+            {
+                AppConfig.BallVisible = ballItem.Checked;
+                AppConfig.Save();
+                ApplyBallVisibility();
+            };
+            menu.Items.Add(ballItem);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("退出程序", null, delegate { QuitApp(); });
+
+            var r = btnRect[BtnId.Settings];
+            menu.Show(this, new Point(r.Left, r.Bottom + 2));
+        }
+
+        /// <summary>真正退出（托盘 / 悬浮球 / 设置菜单「退出」调用）。</summary>
+        public void QuitApp()
+        {
+            reallyExit = true;
+            try { if (trayIcon != null) trayIcon.Visible = false; } catch { }
+            Application.Exit();   // 触发 FormClosing；reallyExit=true 不再拦截
+        }
+
         void InitFonts()
         {
-            titleFont = new Font("Microsoft YaHei", 24F, FontStyle.Bold);
-            subFont = new Font("Microsoft YaHei", 9F);
-            labelFont = new Font("Microsoft YaHei", 8.5F, FontStyle.Bold);
-            nameFont = new Font("Microsoft YaHei", 44F, FontStyle.Bold);
-            chipFont = new Font("Microsoft YaHei", 11F, FontStyle.Bold);
-            hintFont = new Font("Microsoft YaHei", 8.5F);
-            btnFont = new Font("Microsoft YaHei", 13F, FontStyle.Bold);
+            titleFont = new Font("Microsoft YaHei", 27F, FontStyle.Bold);
+            subFont = new Font("Microsoft YaHei", 10F);
+            labelFont = new Font("Microsoft YaHei", 9.5F, FontStyle.Bold);
+            nameFont = new Font("Microsoft YaHei", 46F, FontStyle.Bold);
+            chipFont = new Font("Microsoft YaHei", 12F, FontStyle.Bold);
+            hintFont = new Font("Microsoft YaHei", 9.5F);
+            btnFont = new Font("Microsoft YaHei", 14.5F, FontStyle.Bold);
         }
 
         void InitForm()
@@ -496,30 +606,61 @@ namespace LuckyPicker
             btnRect[BtnId.Multi] = new Rectangle(458, 546, 330, 62);
             btnRect[BtnId.Reset] = new Rectangle(696, 468, 120, 34);
             btnRect[BtnId.AddBlock] = new Rectangle(396, 664, 120, 34);
-            // 顶部工具按钮
-            btnRect[BtnId.Editor] = new Rectangle(404, 86, 150, 30);
-            btnRect[BtnId.History] = new Rectangle(560, 86, 148, 30);
-            btnRect[BtnId.About] = new Rectangle(716, 86, 124, 30);
+            // 顶部：设置按钮（集成名单管理 / 抽选记录 / 版本更新 / 开机自启 / 悬浮球）
+            btnRect[BtnId.Settings] = new Rectangle(700, 86, 140, 32);
             // 结果区“重播”小按钮
             btnRect[BtnId.Replay] = new Rectangle(342, 320, 56, 26);
         }
 
         // ============ 数据加载 ============
+        /// <summary>名单数据目录：%ProgramData%\LuckyPicker（系统目录安装后仍可写；便携时自动回退）。</summary>
+        public static string DataDir()
+        {
+            try
+            {
+                string pd = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "LuckyPicker");
+                Directory.CreateDirectory(pd);
+                return pd;
+            }
+            catch { return AppDomain.CurrentDomain.BaseDirectory; }
+        }
+
+        /// <summary>名单数据文件完整路径（编辑器保存 / 主程序读取共用）。</summary>
+        public static string DataPath() { return Path.Combine(DataDir(), "students.json"); }
+
         DataFile LoadData()
         {
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "students.json");
             string json = null;
-            if (File.Exists(path))
+            string pdPath = DataPath();
+            // 1) 首选 ProgramData 数据目录
+            if (File.Exists(pdPath))
             {
-                try { json = File.ReadAllText(path); } catch { }
+                try { json = File.ReadAllText(pdPath); } catch { }
             }
+            // 2) 便携场景：exe 目录（读到后同步到数据目录）
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                string exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "students.json");
+                if (File.Exists(exePath))
+                {
+                    try
+                    {
+                        json = File.ReadAllText(exePath);
+                        try { File.WriteAllText(pdPath, json); } catch { }
+                    }
+                    catch { }
+                }
+            }
+            // 3) 内嵌默认名单（写入数据目录备用）
             if (string.IsNullOrWhiteSpace(json))
             {
                 var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("LuckyPicker.students.json");
                 if (s != null)
                 {
                     using (var r = new StreamReader(s)) json = r.ReadToEnd();
-                    try { File.WriteAllText(path, json); } catch { }
+                    try { File.WriteAllText(pdPath, json); } catch { }
                 }
             }
             if (string.IsNullOrWhiteSpace(json)) return new DataFile();
@@ -939,18 +1080,16 @@ namespace LuckyPicker
 
         void DrawToolbarButtons(Graphics g)
         {
-            DrawToolButton(g, BtnId.Editor, "名单管理 · 导入");
-            DrawToolButton(g, BtnId.History, "抽选记录");
-            DrawToolButton(g, BtnId.About, "版本 · 更新");
+            DrawToolButton(g, BtnId.Settings, "设置 ▼");
         }
 
         void DrawToolButton(Graphics g, BtnId id, string text)
         {
             Rectangle r = btnRect[id];
             bool hover = hoverBtns.Contains(id);
-            UI.FillRound(g, r, 15, hover ? Color.FromArgb(219, 234, 254) : Color.White);
-            UI.DrawRound(g, r, 15, Color.FromArgb(59, 130, 246), 1f);
-            using (var f = new Font("Microsoft YaHei", 8.5F))
+            UI.FillRound(g, r, 16, hover ? Color.FromArgb(219, 234, 254) : Color.White);
+            UI.DrawRound(g, r, 16, Color.FromArgb(59, 130, 246), 1f);
+            using (var f = new Font("Microsoft YaHei", 9.5F))
             using (var b = new SolidBrush(Color.FromArgb(37, 99, 235)))
             using (var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
                 g.DrawString(text, f, b, r, fmt);
@@ -1050,9 +1189,7 @@ namespace LuckyPicker
                     case BtnId.Multi: PickMultiple(5); return;
                     case BtnId.Reset: ResetPool(); return;
                     case BtnId.AddBlock: AddBlock(); return;
-                    case BtnId.Editor: OpenEditor(); return;
-                    case BtnId.History: OpenHistory(); return;
-                    case BtnId.About: OpenAbout(); return;
+                    case BtnId.Settings: ShowSettingsMenu(); return;
                     case BtnId.Replay: ReplayLast(); return;
                 }
                 // 性别/开关变化后刷新池
@@ -1115,10 +1252,25 @@ namespace LuckyPicker
             tts.QueueWarmup(names);
         }
 
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // 点击关闭按钮 → 最小化到托盘（悬浮球与托盘图标保持可见），不退出
+            if (!reallyExit && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                WindowState = FormWindowState.Minimized;
+                Hide();
+                ShowInTaskbar = false;
+                return;
+            }
+            base.OnFormClosing(e);
+        }
+
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             base.OnFormClosed(e);
             try { if (ball != null) ball.Dispose(); } catch { }
+            try { if (trayIcon != null) { trayIcon.Visible = false; trayIcon.Dispose(); } } catch { }
             if (tts != null) { try { tts.Dispose(); } catch { } }
         }
 
